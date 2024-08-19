@@ -79,20 +79,19 @@ class Book:
         return "Book not found."
 
 class User:
-    def __init__(self, name, library_id, password):
+    def __init__(self, name, library_id):
         self.name = name
         self.library_id = library_id
-        self.password = password
 
     def add_user(self):
         """Add a new user to the database."""
-        query = "INSERT INTO users (name, library_id, password) VALUES (%s, %s, %s)"
-        execute_query(query, (self.name, self.library_id, self.password))
+        query = "INSERT INTO users (name, library_id) VALUES (%s, %s)"
+        execute_query(query, (self.name, self.library_id))
 
     def authenticate_user(self):
         """Authenticate user credentials."""
-        query = "SELECT id FROM users WHERE library_id = %s AND password = %s"
-        result = fetch_one_query(query, (self.library_id, self.password))
+        query = "SELECT id FROM users WHERE library_id = %s"
+        result = fetch_one_query(query, (self.library_id,))
         return result[0] if result else None
 
     def display_details(self):
@@ -150,9 +149,9 @@ def borrow_book(user_id, book_isbn):
     """Allow a user to borrow a book."""
     book = Book("", 0, 0, book_isbn, "")
     if book.borrow_book():
-        query = "INSERT INTO borrowed_books (user_id, book_id, borrow_date) SELECT %s, id, %s FROM books WHERE isbn = %s"
         book_id = fetch_one_query("SELECT id FROM books WHERE isbn = %s", (book_isbn,))[0]
-        execute_query(query, (user_id, datetime.now().date(), book_id))
+        query = "INSERT INTO borrowed_books (user_id, book_id, borrow_date) VALUES (%s, %s, %s)"
+        execute_query(query, (user_id, book_id, datetime.now().date()))
         return True
     return False
 
@@ -177,14 +176,14 @@ def display_books():
     for result in results:
         print(f"ID: {result[0]}, Title: {result[1]}, Author ID: {result[2]}, Genre ID: {result[3]}, ISBN: {result[4]}, Publication Date: {result[5]}, Availability: {result[6]}")
 
-def add_user(name, library_id, password):
+def add_user(name, library_id):
     """Add a new user to the database."""
-    new_user = User(name, library_id, password)
+    new_user = User(name, library_id)
     new_user.add_user()
 
-def authenticate_user(library_id, password):
+def authenticate_user(library_id):
     """Authenticate user credentials."""
-    user = User("", library_id, password)
+    user = User("", library_id)
     return user.authenticate_user()
 
 def add_author(name, biography):
@@ -217,206 +216,3 @@ def display_genres():
     results = fetch_query(query)
     for result in results:
         print(f"ID: {result[0]}, Name: {result[1]}, Description: {result[2]}, Category: {result[3]}")
-
-def calculate_fine(borrow_date, return_date):
-    """Calculate fine based on the number of overdue days."""
-    if return_date and return_date > borrow_date:
-        days_late = (return_date - borrow_date).days - 14  # 14 days is the loan period
-        if days_late > 0:
-            fine = days_late * 1  # $1 fine per day
-            return fine
-    return 0
-
-def view_borrowed_books(user_id):
-    """View borrowed books for a user."""
-    query = """
-    SELECT b.title, bb.borrow_date, bb.return_date
-    FROM borrowed_books bb
-    JOIN books b ON bb.book_id = b.id
-    WHERE bb.user_id = %s
-    """
-    results = fetch_query(query, (user_id,))
-    for result in results:
-        title, borrow_date, return_date = result
-        fine = calculate_fine(borrow_date, return_date) if return_date else "Not Returned"
-        print(f"Title: {title}, Borrow Date: {borrow_date}, Return Date: {return_date}, Fine: {fine}")
-
-def book_operations_menu():
-    """Book operations menu."""
-    while True:
-        print("\nBook Operations:")
-        print("1. Add a new book")
-        print("2. Borrow a book")
-        print("3. Return a book")
-        print("4. Search for a book")
-        print("5. Display all books")
-        print("6. Back to Main Menu")
-
-        choice = input("Enter your choice: ")
-
-        if choice == '1':
-            title = input("Enter book title: ")
-            author_id = int(input("Enter author ID: "))
-            genre_id = int(input("Enter genre ID: "))
-            isbn = input("Enter book ISBN: ")
-            publication_date = input("Enter book publication date (YYYY-MM-DD): ")
-            add_book(title, author_id, genre_id, isbn, publication_date)
-            print("Book added successfully!")
-        elif choice == '2':
-            library_id = input("Enter your library ID: ")
-            password = input("Enter your password: ")
-            user_id = authenticate_user(library_id, password)
-            if user_id:
-                book_isbn = input("Enter book ISBN to borrow: ")
-                if borrow_book(user_id, book_isbn):
-                    print("Book borrowed successfully!")
-                else:
-                    print("Borrowing failed. Please check the book's availability.")
-            else:
-                print("Authentication failed. Please check your credentials.")
-        elif choice == '3':
-            library_id = input("Enter your library ID: ")
-            password = input("Enter your password: ")
-            user_id = authenticate_user(library_id, password)
-            if user_id:
-                book_isbn = input("Enter book ISBN to return: ")
-                return_book(user_id, book_isbn)
-                print("Book returned successfully!")
-            else:
-                print("Authentication failed. Please check your credentials.")
-        elif choice == '4':
-            search_title = input("Enter book title to search: ")
-            search_book(search_title)
-        elif choice == '5':
-            display_books()
-        elif choice == '6':
-            break
-        else:
-            print("Invalid choice. Please enter a number from 1 to 6.")
-
-def user_operations_menu():
-    """User operations menu."""
-    while True:
-        print("\nUser Operations:")
-        print("1. Add a new user")
-        print("2. View user details")
-        print("3. Display all users")
-        print("4. View borrowed books")
-        print("5. Back to Main Menu")
-
-        choice = input("Enter your choice: ")
-
-        if choice == '1':
-            name = input("Enter user name: ")
-            library_id = input("Enter user library ID: ")
-            password = input("Enter user password: ")
-            add_user(name, library_id, password)
-            print("User added successfully!")
-        elif choice == '2':
-            library_id = input("Enter user library ID: ")
-            password = input("Enter user password: ")
-            user_id = authenticate_user(library_id, password)
-            if user_id:
-                user = User("", library_id, password)
-                print(user.display_details())
-            else:
-                print("Authentication failed. Please check your credentials.")
-        elif choice == '3':
-            display_users()
-        elif choice == '4':
-            library_id = input("Enter your library ID: ")
-            password = input("Enter your password: ")
-            user_id = authenticate_user(library_id, password)
-            if user_id:
-                view_borrowed_books(user_id)
-            else:
-                print("Authentication failed. Please check your credentials.")
-        elif choice == '5':
-            break
-        else:
-            print("Invalid choice. Please enter a number from 1 to 5.")
-
-def author_operations_menu():
-    """Author operations menu."""
-    while True:
-        print("\nAuthor Operations:")
-        print("1. Add a new author")
-        print("2. View author details")
-        print("3. Display all authors")
-        print("4. Back to Main Menu")
-
-        choice = input("Enter your choice: ")
-
-        if choice == '1':
-            name = input("Enter author name: ")
-            biography = input("Enter author biography: ")
-            add_author(name, biography)
-            print("Author added successfully!")
-        elif choice == '2':
-            name = input("Enter author name to view details: ")
-            author = Author(name, "")
-            print(author.display_details())
-        elif choice == '3':
-            display_authors()
-        elif choice == '4':
-            break
-        else:
-            print("Invalid choice. Please enter a number from 1 to 4.")
-
-def genre_operations_menu():
-    """Genre operations menu."""
-    while True:
-        print("\nGenre Operations:")
-        print("1. Add a new genre")
-        print("2. View genre details")
-        print("3. Display all genres")
-        print("4. Back to Main Menu")
-
-        choice = input("Enter your choice: ")
-
-        if choice == '1':
-            name = input("Enter genre name: ")
-            description = input("Enter genre description: ")
-            category = input("Enter genre category: ")
-            add_genre(name, description, category)
-            print("Genre added successfully!")
-        elif choice == '2':
-            name = input("Enter genre name to view details: ")
-            genre = Genre(name, "", "")
-            print(genre.display_details())
-        elif choice == '3':
-            display_genres()
-        elif choice == '4':
-            break
-        else:
-            print("Invalid choice. Please enter a number from 1 to 4.")
-
-def main():
-    """Main menu for the Library Management System."""
-    print("Welcome to the Library Management System with Database Integration!")
-    while True:
-        print("\nMain Menu:")
-        print("1. Book Operations")
-        print("2. User Operations")
-        print("3. Author Operations")
-        print("4. Genre Operations")
-        print("5. Quit")
-
-        choice = input("Enter your choice: ")
-
-        if choice == '1':
-            book_operations_menu()
-        elif choice == '2':
-            user_operations_menu()
-        elif choice == '3':
-            author_operations_menu()
-        elif choice == '4':
-            genre_operations_menu()
-        elif choice == '5':
-            print("Thank you for using the Library Management System. Goodbye!")
-            break
-        else:
-            print("Invalid choice. Please enter a number from 1 to 5.")
-
-if __name__ == "__main__":
-    main()
